@@ -11,10 +11,6 @@ on:
           - Sonoma v14.5
           - Ventura v13.6.7
           - Monterey v12.7.5
-          - Big Sur v11.7.10
-          - Catalina v10.15.7
-          - Mojave v10.14.6
-          - High Sierra v10.13.6
       file:
         type: choice
         description: "File Type"
@@ -27,18 +23,16 @@ on:
 run-name: Generate macOS Installer - ${{ github.event.inputs.macos_version }} ${{ github.event.inputs.file }}
 
 env:
-  installer_version: "" # Do not touch: Populated by extract-details (suppresses warnings)
-  installer_name: "" # Do not touch: Populated by extract-details (suppresses warnings)
+  installer_version: ""
+  installer_name: ""
 
 jobs:
   build:
-    runs-on: macos-latest
-    if: github.repository == 'vivek977/Download-macOS'
+    runs-on: macos-13
 
     steps:
       - uses: actions/checkout@v4
-      
-      # Setup
+
       - name: Extract Version Details
         id: extract-details
         run: |
@@ -46,13 +40,11 @@ jobs:
           echo "installer_version=${string//*v/}" >> $GITHUB_ENV
           echo "installer_name=${string// v*/}" >> $GITHUB_ENV
 
-      # Download Installer
       - name: Download macOS Installer
         run: |
           softwareupdate --fetch-full-installer --full-installer-version ${{ env.installer_version }}
 
-      # Generate Installer
-      - if: github.event.inputs.file == 'dmg'
+      - if: ${{ github.event.inputs.file == 'DMG' }}
         name: Generate macOS DMG Installer
         run: |
           sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
@@ -60,32 +52,30 @@ jobs:
           sleep 10
           sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          sudo mv /tmp/'${{ env.installer_name }}'.dmg ~/Desktop/'${{ env.installer_name }}'.dmg
+          sudo mv /tmp/'${{ env.installer_name }}'.dmg $HOME/Desktop/'${{ env.installer_name }}'.dmg
 
-      - if: github.event.inputs.file == 'iso'
+      - if: ${{ github.event.inputs.file == 'ISO' }}
         name: Generate macOS ISO Installer
         run: |
           sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
           sudo hdiutil attach /tmp/'${{ env.installer_name }}'.dmg -noverify -mountpoint /Volumes/'${{ env.installer_name }}'
           sleep 20
           sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
-          echo "Sleeping 100 to allow the installer to finish"
           sleep 100
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o ~/Desktop/'${{ env.installer_name }}'
-          mv -v ~/Desktop/'${{ env.installer_name }}'.cdr ~/Desktop/'${{ env.installer_name }}'.iso
+          hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o $HOME/Desktop/'${{ env.installer_name }}'
+          mv -v $HOME/Desktop/'${{ env.installer_name }}'.cdr $HOME/Desktop/'${{ env.installer_name }}'.iso
           sudo rm -fv /tmp/'${{ env.installer_name }}'.dmg
 
-      - if: github.event.inputs.file == 'zip'
+      - if: ${{ github.event.inputs.file == 'ZIP' }}
         name: Generate macOS ZIP Installer
         run: |
           cd /Applications
           zip -r 'Install macOS ${{ env.installer_name }}.zip' 'Install macOS ${{ env.installer_name }}.app'
-          mv -v 'Install macOS ${{ env.installer_name }}.zip' ~/Desktop/'${{ env.installer_name }}.zip'
+          mv -v 'Install macOS ${{ env.installer_name }}.zip' $HOME/Desktop/'${{ env.installer_name }}.zip'
 
-      # Upload Installer
-      - name: Upload ${{ github.event.inputs.file }}
+      - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
           name: macOS ${{ env.installer_name }}
-          path: "~/Desktop/${{ env.installer_name }}.${{ github.event.inputs.file }}"
+          path: "${{ env.HOME }}/Desktop/${{ env.installer_name }}.${{ github.event.inputs.file }}"
