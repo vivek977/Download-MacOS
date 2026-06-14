@@ -25,6 +25,7 @@ run-name: Generate macOS Installer - ${{ github.event.inputs.macos_version }} ${
 env:
   installer_version: ""
   installer_name: ""
+  file_ext: ""
 
 jobs:
   build:
@@ -39,10 +40,14 @@ jobs:
           string="${{ github.event.inputs.macos_version }}"
           echo "installer_version=${string//*v/}" >> $GITHUB_ENV
           echo "installer_name=${string// v*/}" >> $GITHUB_ENV
+          echo "file_ext=$(echo '${{ github.event.inputs.file }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Install mist-cli
+        run: brew install mist-cli
 
       - name: Download macOS Installer
         run: |
-          softwareupdate --fetch-full-installer --full-installer-version ${{ env.installer_version }}
+          sudo mist download installer ${{ env.installer_version }} --output-directory /Applications --quiet
 
       - if: ${{ github.event.inputs.file == 'DMG' }}
         name: Generate macOS DMG Installer
@@ -52,7 +57,7 @@ jobs:
           sleep 10
           sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          sudo mv /tmp/'${{ env.installer_name }}'.dmg $HOME/Desktop/'${{ env.installer_name }}'.dmg
+          sudo mv /tmp/'${{ env.installer_name }}'.dmg /Users/runner/Desktop/'${{ env.installer_name }}'.dmg
 
       - if: ${{ github.event.inputs.file == 'ISO' }}
         name: Generate macOS ISO Installer
@@ -63,8 +68,8 @@ jobs:
           sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
           sleep 100
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o $HOME/Desktop/'${{ env.installer_name }}'
-          mv -v $HOME/Desktop/'${{ env.installer_name }}'.cdr $HOME/Desktop/'${{ env.installer_name }}'.iso
+          hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o /Users/runner/Desktop/'${{ env.installer_name }}'
+          mv -v /Users/runner/Desktop/'${{ env.installer_name }}'.cdr /Users/runner/Desktop/'${{ env.installer_name }}'.iso
           sudo rm -fv /tmp/'${{ env.installer_name }}'.dmg
 
       - if: ${{ github.event.inputs.file == 'ZIP' }}
@@ -72,10 +77,10 @@ jobs:
         run: |
           cd /Applications
           zip -r 'Install macOS ${{ env.installer_name }}.zip' 'Install macOS ${{ env.installer_name }}.app'
-          mv -v 'Install macOS ${{ env.installer_name }}.zip' $HOME/Desktop/'${{ env.installer_name }}.zip'
+          mv -v 'Install macOS ${{ env.installer_name }}.zip' /Users/runner/Desktop/'${{ env.installer_name }}.zip'
 
       - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
           name: macOS ${{ env.installer_name }}
-          path: "${{ env.HOME }}/Desktop/${{ env.installer_name }}.${{ github.event.inputs.file }}"
+          path: /Users/runner/Desktop/${{ env.installer_name }}.${{ env.file_ext }}
