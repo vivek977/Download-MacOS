@@ -26,7 +26,6 @@ env:
   installer_version: ""
   installer_name: ""
   file_ext: ""
-  app_path: ""
 
 jobs:
   build:
@@ -36,7 +35,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Extract Version Details
-        id: extract-details
         run: |
           string="${{ github.event.inputs.macos_version }}"
           echo "installer_version=${string//*v/}" >> $GITHUB_ENV
@@ -46,47 +44,29 @@ jobs:
       - name: Install mist-cli
         run: brew install mist-cli
 
-      - name: Download macOS Installer
+      - name: Generate macOS Installer
         run: |
-          sudo mist download installer ${{ env.installer_version }} application --output-directory /Applications --quiet
+          FILE="${{ github.event.inputs.file }}"
+          VERSION="${{ env.installer_version }}"
+          NAME="${{ env.installer_name }}"
+          DEST="/Users/runner/Desktop"
 
-      - name: Find Installer App
-        run: |
-          APP_PATH=$(find /Applications -name "Install macOS *.app" -maxdepth 3 | head -1)
-          echo "Found installer at: $APP_PATH"
-          echo "app_path=$APP_PATH" >> $GITHUB_ENV
+          if [ "$FILE" = "DMG" ]; then
+            sudo mist download installer "$VERSION" image --output-directory "$DEST"
+            GENERATED=$(find "$DEST" -name "*.dmg" | head -1)
+            mv "$GENERATED" "$DEST/$NAME.dmg"
 
-      - if: ${{ github.event.inputs.file == 'DMG' }}
-        name: Generate macOS DMG Installer
-        run: |
-          sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
-          sudo hdiutil attach /tmp/'${{ env.installer_name }}'.dmg -noverify -mountpoint /Volumes/'${{ env.installer_name }}'
-          sleep 10
-          sudo '${{ env.app_path }}/Contents/Resources/createinstallmedia' --volume /Volumes/'${{ env.installer_name }}' --nointeraction
-          hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          sudo mv /tmp/'${{ env.installer_name }}'.dmg /Users/runner/Desktop/'${{ env.installer_name }}'.dmg
+          elif [ "$FILE" = "ISO" ]; then
+            sudo mist download installer "$VERSION" iso --output-directory "$DEST"
+            GENERATED=$(find "$DEST" -name "*.iso" | head -1)
+            mv "$GENERATED" "$DEST/$NAME.iso"
 
-      - if: ${{ github.event.inputs.file == 'ISO' }}
-        name: Generate macOS ISO Installer
-        run: |
-          sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
-          sudo hdiutil attach /tmp/'${{ env.installer_name }}'.dmg -noverify -mountpoint /Volumes/'${{ env.installer_name }}'
-          sleep 20
-          sudo '${{ env.app_path }}/Contents/Resources/createinstallmedia' --volume /Volumes/'${{ env.installer_name }}' --nointeraction
-          sleep 100
-          hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
-          hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o /Users/runner/Desktop/'${{ env.installer_name }}'
-          mv -v /Users/runner/Desktop/'${{ env.installer_name }}'.cdr /Users/runner/Desktop/'${{ env.installer_name }}'.iso
-          sudo rm -fv /tmp/'${{ env.installer_name }}'.dmg
-
-      - if: ${{ github.event.inputs.file == 'ZIP' }}
-        name: Generate macOS ZIP Installer
-        run: |
-          APP_DIR=$(dirname '${{ env.app_path }}')
-          APP_NAME=$(basename '${{ env.app_path }}')
-          cd "$APP_DIR"
-          zip -r "$APP_NAME.zip" "$APP_NAME"
-          mv -v "$APP_NAME.zip" /Users/runner/Desktop/'${{ env.installer_name }}.zip'
+          elif [ "$FILE" = "ZIP" ]; then
+            sudo mist download installer "$VERSION" application --output-directory /tmp
+            APP=$(find /tmp -name "Install macOS *.app" -maxdepth 3 | head -1)
+            cd "$(dirname "$APP")"
+            zip -r "$DEST/$NAME.zip" "$(basename "$APP")"
+          fi
 
       - name: Upload Installer
         uses: actions/upload-artifact@v4
