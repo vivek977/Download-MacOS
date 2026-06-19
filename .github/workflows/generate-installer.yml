@@ -8,9 +8,10 @@ on:
         description: "macOS Version"
         required: true
         options:
-          - Sonoma v14.5
-          - Ventura v13.6.7
-          - Monterey v12.7.5
+          - Sequoia
+          - Sonoma
+          - Ventura
+          - Monterey
       file:
         type: choice
         description: "File Type"
@@ -23,7 +24,6 @@ on:
 run-name: Generate macOS Installer - ${{ github.event.inputs.macos_version }} ${{ github.event.inputs.file }}
 
 env:
-  installer_version: ""
   installer_name: ""
   file_ext: ""
 
@@ -36,9 +36,7 @@ jobs:
 
       - name: Extract Version Details
         run: |
-          string="${{ github.event.inputs.macos_version }}"
-          echo "installer_version=${string//*v/}" >> $GITHUB_ENV
-          echo "installer_name=${string// v*/}" >> $GITHUB_ENV
+          echo "installer_name=${{ github.event.inputs.macos_version }}" >> $GITHUB_ENV
           echo "file_ext=$(echo '${{ github.event.inputs.file }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Install mist-cli
@@ -47,26 +45,26 @@ jobs:
       - name: Generate macOS Installer
         run: |
           FILE="${{ github.event.inputs.file }}"
-          VERSION="${{ env.installer_version }}"
           NAME="${{ env.installer_name }}"
           DEST="/Users/runner/Desktop"
 
-          if [ "$FILE" = "DMG" ]; then
-            sudo mist download installer "$VERSION" image --output-directory "$DEST"
-            GENERATED=$(find "$DEST" -name "*.dmg" | head -1)
-            mv "$GENERATED" "$DEST/$NAME.dmg"
-
-          elif [ "$FILE" = "ISO" ]; then
-            sudo mist download installer "$VERSION" iso --output-directory "$DEST"
-            GENERATED=$(find "$DEST" -name "*.iso" | head -1)
-            mv "$GENERATED" "$DEST/$NAME.iso"
-
-          elif [ "$FILE" = "ZIP" ]; then
-            sudo mist download installer "$VERSION" application --output-directory /tmp
-            APP=$(find /tmp -name "Install macOS *.app" -maxdepth 3 | head -1)
-            cd "$(dirname "$APP")"
-            zip -r "$DEST/$NAME.zip" "$(basename "$APP")"
-          fi
+          case "$FILE" in
+            DMG)
+              sudo mist download installer "$NAME" image \
+                --image-name "$NAME.dmg" --output-directory "$DEST"
+              ;;
+            ISO)
+              sudo mist download installer "$NAME" iso \
+                --iso-name "$NAME.iso" --output-directory "$DEST"
+              ;;
+            ZIP)
+              sudo mist download installer "$NAME" application \
+                --application-name "Install macOS $NAME.app" --output-directory /tmp
+              cd /tmp
+              zip -r "$DEST/$NAME.zip" "Install macOS $NAME.app"
+              ;;
+          esac
+          ls -la "$DEST"
 
       - name: Upload Installer
         uses: actions/upload-artifact@v4
