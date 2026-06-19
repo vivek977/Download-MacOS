@@ -12,13 +12,14 @@ jobs:
       list: ${{ steps.list.outputs.stdout }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install mist-cli
+        run: brew install mist-cli
       - name: List Installers
         uses: mathiasvr/command-output@v2.0.0
         id: list
         with:
           run: |
-            softwareupdate
-            softwareupdate --list-full-installers
+            mist list installer
   send-report:
     runs-on: ubuntu-latest
     needs: [list-installers]

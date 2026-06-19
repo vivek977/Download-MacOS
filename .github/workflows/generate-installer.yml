@@ -12,6 +12,7 @@ on:
           - Sonoma
           - Ventura
           - Monterey
+          - Big Sur
       file:
         type: choice
         description: "File Type"
