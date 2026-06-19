@@ -47,7 +47,7 @@ jobs:
 
       - name: Download macOS Installer
         run: |
-          sudo mist download installer ${{ env.installer_version }} --output-directory /Applications --quiet
+          sudo mist download installer ${{ env.installer_version }} application --output-directory /Applications --quiet
 
       - if: ${{ github.event.inputs.file == 'DMG' }}
         name: Generate macOS DMG Installer
