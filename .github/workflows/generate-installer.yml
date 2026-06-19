@@ -26,6 +26,7 @@ env:
   installer_version: ""
   installer_name: ""
   file_ext: ""
+  app_path: ""
 
 jobs:
   build:
@@ -49,13 +50,19 @@ jobs:
         run: |
           sudo mist download installer ${{ env.installer_version }} application --output-directory /Applications --quiet
 
+      - name: Find Installer App
+        run: |
+          APP_PATH=$(find /Applications -name "Install macOS *.app" -maxdepth 3 | head -1)
+          echo "Found installer at: $APP_PATH"
+          echo "app_path=$APP_PATH" >> $GITHUB_ENV
+
       - if: ${{ github.event.inputs.file == 'DMG' }}
         name: Generate macOS DMG Installer
         run: |
           sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
           sudo hdiutil attach /tmp/'${{ env.installer_name }}'.dmg -noverify -mountpoint /Volumes/'${{ env.installer_name }}'
           sleep 10
-          sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
+          sudo '${{ env.app_path }}/Contents/Resources/createinstallmedia' --volume /Volumes/'${{ env.installer_name }}' --nointeraction
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
           sudo mv /tmp/'${{ env.installer_name }}'.dmg /Users/runner/Desktop/'${{ env.installer_name }}'.dmg
 
@@ -65,7 +72,7 @@ jobs:
           sudo hdiutil create -o /tmp/'${{ env.installer_name }}' -size 16384m -volname '${{ env.installer_name }}' -layout SPUD -fs HFS+J
           sudo hdiutil attach /tmp/'${{ env.installer_name }}'.dmg -noverify -mountpoint /Volumes/'${{ env.installer_name }}'
           sleep 20
-          sudo /Applications/'Install macOS ${{ env.installer_name }}'.app/Contents/Resources/createinstallmedia --volume /Volumes/'${{ env.installer_name }}' --nointeraction
+          sudo '${{ env.app_path }}/Contents/Resources/createinstallmedia' --volume /Volumes/'${{ env.installer_name }}' --nointeraction
           sleep 100
           hdiutil eject -force /Volumes/'Install macOS ${{ env.installer_name }}'
           hdiutil convert /tmp/'${{ env.installer_name }}'.dmg -format UDTO -o /Users/runner/Desktop/'${{ env.installer_name }}'
@@ -75,9 +82,11 @@ jobs:
       - if: ${{ github.event.inputs.file == 'ZIP' }}
         name: Generate macOS ZIP Installer
         run: |
-          cd /Applications
-          zip -r 'Install macOS ${{ env.installer_name }}.zip' 'Install macOS ${{ env.installer_name }}.app'
-          mv -v 'Install macOS ${{ env.installer_name }}.zip' /Users/runner/Desktop/'${{ env.installer_name }}.zip'
+          APP_DIR=$(dirname '${{ env.app_path }}')
+          APP_NAME=$(basename '${{ env.app_path }}')
+          cd "$APP_DIR"
+          zip -r "$APP_NAME.zip" "$APP_NAME"
+          mv -v "$APP_NAME.zip" /Users/runner/Desktop/'${{ env.installer_name }}.zip'
 
       - name: Upload Installer
         uses: actions/upload-artifact@v4
