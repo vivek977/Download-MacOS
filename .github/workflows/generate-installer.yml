@@ -40,6 +40,20 @@ jobs:
           echo "installer_name=${{ github.event.inputs.macos_version }}" >> $GITHUB_ENV
           echo "file_ext=$(echo '${{ github.event.inputs.file }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      - name: Free up disk space
+        run: |
+          echo "Disk usage before cleanup:"
+          df -h /
+          # Remove pre-installed Xcode versions and simulators we don't need.
+          # This reclaims ~30-65 GB, which the ISO/DMG build needs for its
+          # temporary working image + final output (caches alone are not enough).
+          sudo rm -rf /Applications/Xcode_*.app
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
+          xcrun simctl delete all || true
+          echo "Disk usage after cleanup:"
+          df -h /
+
       - name: Install mist-cli
         run: brew install mist-cli
 
